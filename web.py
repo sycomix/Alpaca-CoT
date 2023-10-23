@@ -46,8 +46,7 @@ def server(instruction):
         generation_config=generation_config
     )
     res = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    output = generate_service_output(res, prompt, args.llm, args.lora_dir)
-    return output
+    return generate_service_output(res, prompt, args.llm, args.lora_dir)
 
 
 @app.get("/")

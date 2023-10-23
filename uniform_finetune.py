@@ -31,12 +31,9 @@ from peft import (
 import argparse
 from utils.device import get_device_map
 
-device_map = "auto"
 world_size = int(os.environ.get("WORLD_SIZE", 1))
 ddp = world_size != 1
-if ddp:
-    device_map = {"": int(os.environ.get("LOCAL_RANK") or 0)}
-
+device_map = {"": int(os.environ.get("LOCAL_RANK") or 0)} if ddp else "auto"
 ModelClass = namedtuple("ModelClass", ('tokenizer', 'model'))
 
 _MODEL_CLASSES = {
@@ -328,9 +325,9 @@ def train(args):
                 tokenized_result = tokenize(prompt_no_resp)
 
             source_len = len(tokenized_result['input_ids'])
-            prompt_with_response = prompt_no_resp + " " + data_point["output"]
+            prompt_with_response = f"{prompt_no_resp} " + data_point["output"]
             # if "llama" in args.model_type:
-            prompt_with_response += " " + tokenizer.eos_token
+            prompt_with_response += f" {tokenizer.eos_token}"
             if "chatglm" in args.model_type:
                 tokenized_with_response = completion_tokenize(prompt_with_response)
             else:
@@ -338,6 +335,7 @@ def train(args):
             tokenized_with_response["labels"] = [IGNORE_INDEX] * source_len + tokenized_with_response["labels"][source_len:]
 
             return tokenized_with_response
+
 
 
     model_name = args.model_name_or_path.split( '/')[-1]
@@ -389,10 +387,12 @@ def train(args):
             save_steps=saving_step,
             output_dir=output_dir,
             save_total_limit=11,
-            load_best_model_at_end=True if args.val_set_size > 0 else False,
+            load_best_model_at_end=args.val_set_size > 0,
             ddp_find_unused_parameters=False if ddp else None,
         ),
-        data_collator=transformers.DataCollatorForSeq2Seq(tokenizer, return_tensors="pt", padding=True),
+        data_collator=transformers.DataCollatorForSeq2Seq(
+            tokenizer, return_tensors="pt", padding=True
+        ),
     )
     model.config.use_cache = False
 

@@ -22,7 +22,7 @@ _MODEL_CLASSES = {
     "llama": ModelClass(**{
         "tokenizer": LlamaTokenizer,
         "model": LlamaForCausalLM,
-        
+
     }),
     "chatglm": ModelClass(**{
         "tokenizer": AutoTokenizer, #ChatGLMTokenizer,
@@ -38,10 +38,7 @@ _MODEL_CLASSES = {
     })
 }
 
-if torch.cuda.is_available():
-    device = "cuda"
-else:
-    device = "cpu"
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 def get_model_class(model_type, 
                     model_name_or_path, 

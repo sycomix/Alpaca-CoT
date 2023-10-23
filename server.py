@@ -39,8 +39,7 @@ if args.model_type != 'chatglm':
             generation_config=generation_config
         )
         res = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        output = generate_service_output(res, prompt, args.model_type, args.lora_dir)
-        return output
+        return generate_service_output(res, prompt, args.model_type, args.lora_dir)
     while 1:
         print("User:")
         instructions = input()

@@ -50,7 +50,7 @@ def get_data_model(args):
             llm_type = "Auto"
             return MODEL_CLASSES[llm_type], model_path
         else:
-            load_path = llm_type + "_" + model_path
+            load_path = f"{llm_type}_{model_path}"
             return MODEL_CLASSES[llm_type], COMMON_PATH + MODEL_PATHS[load_path]
 
     data = load_dataset("json", data_files=args.data)
@@ -126,8 +126,8 @@ def get_train_val_data(args, data, tokenizer):
         prompt_tokenize, completion_tokenize = get_tokenize_func(args, tokenizer)
         tokenized_result = prompt_tokenize(prompt_no_resp)
         source_len = len(tokenized_result['input_ids'])
-        prompt_with_response = prompt_no_resp + " " + data_point["output"]
-        prompt_with_response += " " + tokenizer.eos_token
+        prompt_with_response = f"{prompt_no_resp} " + data_point["output"]
+        prompt_with_response += f" {tokenizer.eos_token}"
         tokenized_with_response = completion_tokenize(prompt_with_response)
         tokenized_with_response["labels"] = [IGNORE_INDEX] * source_len + tokenized_with_response["labels"][source_len:]
         return tokenized_with_response
@@ -137,8 +137,8 @@ def get_train_val_data(args, data, tokenizer):
         prompt_tokenize, completion_tokenize = get_tokenize_func(args, tokenizer)
         tokenized_result = prompt_tokenize(prompt_no_resp)
         source_len = len(tokenized_result['input_ids'])
-        prompt_with_response = prompt_no_resp + " " + data_point["output"]
-        prompt_with_response += " " + tokenizer.eos_token
+        prompt_with_response = f"{prompt_no_resp} " + data_point["output"]
+        prompt_with_response += f" {tokenizer.eos_token}"
         tokenized_with_response = completion_tokenize(prompt_with_response)
         tokenized_with_response["labels"] = [IGNORE_INDEX] * source_len + tokenized_with_response["labels"][source_len:]
         return tokenized_with_response
@@ -165,11 +165,11 @@ def get_train_val_data(args, data, tokenizer):
 def get_predict_data(args):
     data = load_dataset("json", data_files=args.data)
     print(data)
-    if args.model_type in ['chatglm']:
-        predict_data = data["train"].shuffle().map(generate_prompt_4_chatglm_dict)
-    else:
-        predict_data = data["train"].shuffle().map(generate_prompt_dict)
-    return predict_data
+    return (
+        data["train"].shuffle().map(generate_prompt_4_chatglm_dict)
+        if args.model_type in ['chatglm']
+        else data["train"].shuffle().map(generate_prompt_dict)
+    )
 
 
 def get_fine_tuned_model(args):
@@ -178,7 +178,7 @@ def get_fine_tuned_model(args):
             llm_type = "Auto"
             return MODEL_CLASSES[llm_type], model_path
         else:
-            load_path = llm_type + "_" + model_path
+            load_path = f"{llm_type}_{model_path}"
             if llm_type in ['moss']:
                 load_path = llm_type
             return MODEL_CLASSES[llm_type], COMMON_PATH + MODEL_PATHS[load_path]
@@ -192,7 +192,7 @@ def get_fine_tuned_model(args):
         tokenizer = model_class.tokenizer.from_pretrained(model_path,
                                                           trust_remote_code=True)
         if args.lora_dir != 'none':
-            peft_path = args.lora_dir + "/adapter_model.bin"
+            peft_path = f"{args.lora_dir}/adapter_model.bin"
             peft_config = LoraConfig(
                 task_type=TaskType.CAUSAL_LM,
                 inference_mode=True,
@@ -203,7 +203,7 @@ def get_fine_tuned_model(args):
             )
             model = get_peft_model(model, peft_config)
             model.load_state_dict(torch.load(peft_path, map_location="cpu"), strict=False)
-            # torch.set_default_tensor_type(torch.cuda.FloatTensor)
+                    # torch.set_default_tensor_type(torch.cuda.FloatTensor)
     elif args.model_type == "moss":
         model = model_class.model.from_pretrained(model_path,
                                                   trust_remote_code=True,
@@ -241,7 +241,7 @@ def get_lora_model(args):
             llm_type = "Auto"
             return MODEL_CLASSES[llm_type], model_path
         else:
-            load_path = llm_type + "_" + model_path
+            load_path = f"{llm_type}_{model_path}"
             return MODEL_CLASSES[llm_type], COMMON_PATH + MODEL_PATHS[load_path]
 
     model_class, model_path = _get_model_class(args.model_type, args.size)
@@ -276,35 +276,31 @@ def get_lora_model(args):
 
 def generate_service_prompt(instruction, llm, lora):
     if lora == 'none':
-        if llm in ['chatglm']:
-            return instruction
-        else:
-            return PROMPT_DICT['prompt_format_before'] + instruction + PROMPT_DICT['prompt_format_after']
-    else:
-        if llm in ['moss']:
-            return META_INSTRUCTION.get('moss',"") + PROMPT_DICT['prompt_format_before'] + instruction + PROMPT_DICT['prompt_format_after']
-        return PROMPT_DICT['prompt_format_before'] + instruction + PROMPT_DICT['prompt_format_after']
+        return (
+            instruction
+            if llm in ['chatglm']
+            else PROMPT_DICT['prompt_format_before']
+            + instruction
+            + PROMPT_DICT['prompt_format_after']
+        )
+    if llm in ['moss']:
+        return META_INSTRUCTION.get('moss',"") + PROMPT_DICT['prompt_format_before'] + instruction + PROMPT_DICT['prompt_format_after']
+    return PROMPT_DICT['prompt_format_before'] + instruction + PROMPT_DICT['prompt_format_after']
 
 
 def get_generation_config(llm):
-    generation_configs = GenerationConfig(
+    return GenerationConfig(
         temperature=GENERATE_CONFIG['temperature'],
         top_p=GENERATE_CONFIG['top_p'],
         top_k=GENERATE_CONFIG['top_k'],
         num_beams=GENERATE_CONFIG['num_beams'],
-        max_new_tokens=GENERATE_CONFIG['max_new_tokens']
+        max_new_tokens=GENERATE_CONFIG['max_new_tokens'],
     )
-    return generation_configs
 
 
 def generate_service_output(output, prompt, llm, lora):
-    if lora == 'none':
-        if llm in ['llama']:
-            return output.replace(prompt, '', 1).strip()
-        elif llm in ['chatglm']:
-            return output.replace(prompt, '', 1).strip()
-        else:
-            return output.split("### Response:")[1].strip()
+    if lora == 'none' and llm in ['llama', 'chatglm']:
+        return output.replace(prompt, '', 1).strip()
     else:
         return output.split("### Response:")[1].strip()
 

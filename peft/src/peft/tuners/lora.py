@@ -171,7 +171,6 @@ class LoraModel(torch.nn.Module):
                 if not is_target_modules_in_base_model:
                     is_target_modules_in_base_model = True
                 parent, target, target_name = _get_submodules(self.model, key)
-                bias = target.bias is not None
                 if isinstance(target, LoraLayer):
                     target.update_layer(
                         adapter_name,
@@ -181,6 +180,7 @@ class LoraModel(torch.nn.Module):
                         lora_config.init_lora_weights,
                     )
                 else:
+                    bias = target.bias is not None
                     if loaded_in_8bit and isinstance(target, bnb.nn.Linear8bitLt):
                         eightbit_kwargs = kwargs.copy()
                         eightbit_kwargs.update(
@@ -249,18 +249,17 @@ class LoraModel(torch.nn.Module):
             return getattr(self.model, name)
 
     def get_peft_config_as_dict(self, inference: bool = False):
-        config_dict = {}
         for key, value in self.peft_config.items():
             config = {k: v.value if isinstance(v, Enum) else v for k, v in asdict(value).items()}
             if inference:
                 config["inference_mode"] = True
-        config_dict[key] = config
+        config_dict = {key: config}
         return config
 
     def _set_adapter_layers(self, enabled=True):
         for module in self.model.modules():
             if isinstance(module, LoraLayer):
-                module.disable_adapters = False if enabled else True
+                module.disable_adapters = not enabled
 
     def enable_adapter_layers(self):
         self._set_adapter_layers(enabled=True)
@@ -363,9 +362,7 @@ def mark_only_lora_as_trainable(model: nn.Module, bias: str = "none") -> None:
     for n, p in model.named_parameters():
         if "lora_" not in n:
             p.requires_grad = False
-    if bias == "none":
-        return
-    elif bias == "all":
+    if bias == "all":
         for n, p in model.named_parameters():
             if "bias" in n:
                 p.requires_grad = True
@@ -373,6 +370,8 @@ def mark_only_lora_as_trainable(model: nn.Module, bias: str = "none") -> None:
         for m in model.modules():
             if isinstance(m, LoraLayer) and hasattr(m, "bias") and m.bias is not None:
                 m.bias.requires_grad = True
+    elif bias == "none":
+        return
     else:
         raise NotImplementedError
 

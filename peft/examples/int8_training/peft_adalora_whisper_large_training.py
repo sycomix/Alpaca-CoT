@@ -278,19 +278,20 @@ def parse_args():
 
 
 def load_streaming_dataset(dataset_name, dataset_config_name, split, **kwargs):
-    if "+" in split:
-        # load multiple splits separated by the `+` symbol *with* streaming mode
-        dataset_splits = [
-            load_dataset(dataset_name, dataset_config_name, split=split_name, streaming=True, **kwargs)
-            for split_name in split.split("+")
-        ]
-        # interleave multiple splits to form one dataset
-        interleaved_dataset = interleave_datasets(dataset_splits)
-        return interleaved_dataset
-    else:
-        # load a single split *with* streaming mode
-        dataset = load_dataset(dataset_name, dataset_config_name, split=split, streaming=True, **kwargs)
-        return dataset
+    if "+" not in split:
+        return load_dataset(
+            dataset_name,
+            dataset_config_name,
+            split=split,
+            streaming=True,
+            **kwargs
+        )
+    # load multiple splits separated by the `+` symbol *with* streaming mode
+    dataset_splits = [
+        load_dataset(dataset_name, dataset_config_name, split=split_name, streaming=True, **kwargs)
+        for split_name in split.split("+")
+    ]
+    return interleave_datasets(dataset_splits)
 
 
 def prepare_dataset_wrapper(do_lower_case, do_remove_punctuation, processor, normalizer):
@@ -374,7 +375,7 @@ def evaluation_loop(model, eval_dataloader, processor, normalizer, metric, force
     references = []
     normalized_predictions = []
     normalized_references = []
-    for _, batch in enumerate(tqdm(eval_dataloader)):
+    for batch in tqdm(eval_dataloader):
         with torch.cuda.amp.autocast():
             with torch.no_grad():
                 generated_tokens = (
@@ -401,7 +402,7 @@ def evaluation_loop(model, eval_dataloader, processor, normalizer, metric, force
     eval_metrics = {"eval/wer": wer, "eval/normalized_wer": normalized_wer}
     if accelerator.get_tracker("wandb"):
         sample_size = min(len(predictions), 256)
-        ids = [randint(0, len(predictions) - 1) for p in range(0, sample_size)]
+        ids = [randint(0, len(predictions) - 1) for _ in range(0, sample_size)]
         sample_predictions = [predictions[i] for i in ids]
         sample_references = [references[i] for i in ids]
         sample_normalized_predictions = [normalized_predictions[i] for i in ids]
@@ -543,7 +544,7 @@ def main():
     )
     model.config.forced_decoder_ids = None
     model.config.suppress_tokens = []
-    if len(set(model.hf_device_map.values()).intersection({"cpu", "disk"})) > 0:
+    if set(model.hf_device_map.values()).intersection({"cpu", "disk"}):
         raise ValueError("Training on CPU or disk is not supported.")
     if len(set(model.hf_device_map.values())) > 1:
         device_map = model.hf_device_map.copy()
@@ -755,7 +756,7 @@ def main():
             model, eval_dataloader, processor, normalizer, metric, forced_decoder_ids, accelerator
         )
         if args.with_tracking:
-            best_metrics = {"best_" + k: v for k, v in eval_metrics.items()}
+            best_metrics = {f"best_{k}": v for k, v in eval_metrics.items()}
             accelerator.log(best_metrics, step=global_step)
 
     accelerator.wait_for_everyone()

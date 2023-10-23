@@ -49,12 +49,10 @@ class PeftDecoderModelTester(unittest.TestCase, PeftCommonTester):
         input_ids = torch.tensor([[1, 1, 1], [1, 2, 1]]).to(self.torch_device)
         attention_mask = torch.tensor([[1, 1, 1], [1, 0, 1]]).to(self.torch_device)
 
-        input_dict = {
+        return {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
         }
-
-        return input_dict
 
     @parameterized.expand(PeftTestConfigManager.get_grid_parameters(FULL_GRID))
     def test_attributes_parametrized(self, test_name, model_id, config_cls, config_kwargs):

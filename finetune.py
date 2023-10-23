@@ -30,7 +30,7 @@ args = parser.parse_args()
 
 # optimized for RTX 4090. for larger GPUs, increase some of these?
 MICRO_BATCH_SIZE = 4  # this could actually be 5 but i like powers of 2
-BATCH_SIZE = 128 
+BATCH_SIZE = 128
 GRADIENT_ACCUMULATION_STEPS = BATCH_SIZE // MICRO_BATCH_SIZE
 EPOCHS = 3  # we don't always need 3 tbh
 LEARNING_RATE = 3e-4  # the Karpathy constant
@@ -62,7 +62,7 @@ else:
 
 
 # Your own local path for saving model weights
-OUTPUT_DIR = "saved-"+args.data+args.size+"b"
+OUTPUT_DIR = f"saved-{args.data}{args.size}b"
 
 
 device_map = "auto"
@@ -74,12 +74,12 @@ if ddp:
 
 
 model = LlamaForCausalLM.from_pretrained(
-    "decapoda-research/llama-"+args.size+"b-hf",
+    f"decapoda-research/llama-{args.size}b-hf",
     load_in_8bit=True,
     device_map=device_map,
 )
 tokenizer = LlamaTokenizer.from_pretrained(
-    "decapoda-research/llama-"+args.size+"b-hf", add_eos_token=True
+    f"decapoda-research/llama-{args.size}b-hf", add_eos_token=True
 )
 
 model = prepare_model_for_int8_training(model)
@@ -195,7 +195,7 @@ if VAL_SET_SIZE > 0:
 else:
     train_data = data["train"].shuffle().map(generate_and_tokenize_prompt)
     val_data = None
-    
+
 # from https://github.com/tloen/alpaca-lora/fintune.py    
 if not ddp and torch.cuda.device_count() > 1:
         # keeps Trainer from trying its own DataParallelism when more than 1 gpu is available
@@ -220,10 +220,12 @@ trainer = transformers.Trainer(
         save_steps=200,
         output_dir=OUTPUT_DIR,
         save_total_limit=3,
-        load_best_model_at_end=True if VAL_SET_SIZE > 0 else False,
+        load_best_model_at_end=VAL_SET_SIZE > 0,
         ddp_find_unused_parameters=False if ddp else None,
     ),
-    data_collator=transformers.DataCollatorForLanguageModeling(tokenizer, mlm=False),
+    data_collator=transformers.DataCollatorForLanguageModeling(
+        tokenizer, mlm=False
+    ),
 )
 model.config.use_cache = False
 

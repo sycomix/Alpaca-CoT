@@ -26,7 +26,7 @@ LOAD_8BIT = False
 if args.model_type == "llama":
     BASE_MODEL = "decapoda-research/llama-7b-hf"
     tokenizer = LlamaTokenizer.from_pretrained(BASE_MODEL)
-    LORA_WEIGHTS = "./saved-"+args.data+args.size+"b"
+    LORA_WEIGHTS = f"./saved-{args.data}{args.size}b"
 elif args.model_type == "bloom":
     BASE_MODEL = "bigscience/bloomz-7b1-mt"
     tokenizer = BloomTokenizerFast.from_pretrained(BASE_MODEL)
@@ -34,17 +34,13 @@ elif args.model_type == "bloom":
 elif args.model_type == "chatglm":
     BASE_MODEL = "THUDM/chatglm-6b"
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL,trust_remote_code=True)
-    LORA_WEIGHTS = "./saved_chatglm" + args.data 
+    LORA_WEIGHTS = f"./saved_chatglm{args.data}" 
 
 
 
 
 
-if torch.cuda.is_available():
-    device = "cuda"
-else:
-    device = "cpu"
-
+device = "cuda" if torch.cuda.is_available() else "cpu"
 try:
     if torch.backends.mps.is_available():
         device = "mps"
@@ -126,36 +122,35 @@ elif device == "mps":
             device_map={"": device},
             torch_dtype=torch.float16,
         )
-else:
-    if args.model_type == "llama":
-        model = LlamaForCausalLM.from_pretrained(
-            BASE_MODEL, device_map={"": device}, low_cpu_mem_usage=True
-        )
-        model = PeftModel.from_pretrained(
-            model,
-            LORA_WEIGHTS,
-            device_map={"": device},
-        )
+elif args.model_type == "llama":
+    model = LlamaForCausalLM.from_pretrained(
+        BASE_MODEL, device_map={"": device}, low_cpu_mem_usage=True
+    )
+    model = PeftModel.from_pretrained(
+        model,
+        LORA_WEIGHTS,
+        device_map={"": device},
+    )
 
-    elif args.model_type == "bloom":
-        model = BloomForCausalLM.from_pretrained(
-            BASE_MODEL, device_map={"": device}, low_cpu_mem_usage=True
-        )
-        model = PeftModel.from_pretrained(
-            model,
-            LORA_WEIGHTS,
-            device_map={"": device},
-        )   
-    elif args.model_type == "chatglm":
-        model = AutoModel.from_pretrained(
-            BASE_MODEL,trust_remote_code=True,
-            device_map={"": device}, low_cpu_mem_usage=True
-        )
-        model = PeftModel.from_pretrained(
-            model,
-            LORA_WEIGHTS,
-            device_map={"": device},
-        )   
+elif args.model_type == "bloom":
+    model = BloomForCausalLM.from_pretrained(
+        BASE_MODEL, device_map={"": device}, low_cpu_mem_usage=True
+    )
+    model = PeftModel.from_pretrained(
+        model,
+        LORA_WEIGHTS,
+        device_map={"": device},
+    )
+elif args.model_type == "chatglm":
+    model = AutoModel.from_pretrained(
+        BASE_MODEL,trust_remote_code=True,
+        device_map={"": device}, low_cpu_mem_usage=True
+    )
+    model = PeftModel.from_pretrained(
+        model,
+        LORA_WEIGHTS,
+        device_map={"": device},
+    )   
 def generate_prompt(instruction, input=None):
     if input:
         return f"""Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.

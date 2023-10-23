@@ -107,7 +107,7 @@ global_step = 0
 for epoch in range(num_epochs):
     model.train()
     total_loss = 0
-    for step, batch in enumerate(tqdm(train_dataloader)):
+    for batch in tqdm(train_dataloader):
         batch = {k: v.to(device) for k, v in batch.items()}
         outputs = model(**batch)
         loss = outputs.loss
@@ -124,7 +124,7 @@ for epoch in range(num_epochs):
     model.eval()
     eval_loss = 0
     eval_preds = []
-    for step, batch in enumerate(tqdm(eval_dataloader)):
+    for batch in tqdm(eval_dataloader):
         batch = {k: v.to(device) for k, v in batch.items()}
         with torch.no_grad():
             outputs = model(**batch)

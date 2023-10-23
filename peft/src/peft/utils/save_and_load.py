@@ -35,9 +35,7 @@ def get_peft_model_state_dict(model, state_dict=None, adapter_name="default"):
         # adapted from `https://github.com/microsoft/LoRA/blob/main/loralib/utils.py`
         # to be used directly with the state dict which is necessary when using DeepSpeed or FSDP
         bias = config.bias
-        if bias == "none":
-            to_return = {k: state_dict[k] for k in state_dict if "lora_" in k}
-        elif bias == "all":
+        if bias == "all":
             to_return = {k: state_dict[k] for k in state_dict if "lora_" in k or "bias" in k}
         elif bias == "lora_only":
             to_return = {}
@@ -47,6 +45,8 @@ def get_peft_model_state_dict(model, state_dict=None, adapter_name="default"):
                     bias_name = k.split("lora_")[0] + "bias"
                     if bias_name in state_dict:
                         to_return[bias_name] = state_dict[bias_name]
+        elif bias == "none":
+            to_return = {k: state_dict[k] for k in state_dict if "lora_" in k}
         else:
             raise NotImplementedError
         to_return = {k: v for k, v in to_return.items() if (("lora_" in k and adapter_name in k) or ("bias" in k))}
@@ -57,12 +57,11 @@ def get_peft_model_state_dict(model, state_dict=None, adapter_name="default"):
                 config.rank_pattern = rank_pattern
                 to_return = model.resize_state_dict_by_rank_pattern(rank_pattern, to_return, adapter_name)
     elif isinstance(config, PromptLearningConfig):
-        to_return = {}
         if config.inference_mode:
             prompt_embeddings = model.prompt_encoder[adapter_name].embedding.weight
         else:
             prompt_embeddings = model.get_prompt_embedding_to_save(adapter_name)
-        to_return["prompt_embeddings"] = prompt_embeddings
+        to_return = {"prompt_embeddings": prompt_embeddings}
     else:
         raise NotImplementedError
     if model.modules_to_save is not None:
@@ -105,9 +104,7 @@ def set_peft_model_state_dict(model, peft_model_state_dict, adapter_name="defaul
                     k = k.replace(suffix_to_replace, f"{adapter_name}.{suffix_to_replace}")
                 else:
                     k = f"{k}.{adapter_name}"
-                peft_model_state_dict[k] = v
-            else:
-                peft_model_state_dict[k] = v
+            peft_model_state_dict[k] = v
         if config.peft_type == PeftType.ADALORA:
             rank_pattern = config.rank_pattern
             if rank_pattern is not None:

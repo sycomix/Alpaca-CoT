@@ -231,14 +231,14 @@ formats_dict = {
 def cot_process(data):
     final_list=[]
     x=0
-    with open('./'+data+'_train.tsv') as f:
+    with open(f'./{data}_train.tsv') as f:
         tsvreader = csv.reader(f, delimiter='\t')
+        tem_input = ""
         for line in tsvreader:
             assert len(line) == 3
             x+=1
             if x%500==0:
                 print(x)
-            new_dict={}
             question_option_str = line[0]
 
             answer_str = line[1]
@@ -248,19 +248,19 @@ def cot_process(data):
             template =  formats_dict[data][which_tem]
             assert len(template) == 2
 
-            new_dict={}
+            new_dict = {}
             tem_instruction = template[0].format(question=question_option_str)
-            tem_input = ""
             tem_output = template[1].format(chain_of_thought=cot_str,answer=answer_str)
 
-          
-            new_dict["instruction"] = tem_instruction
-            new_dict["input"] = tem_input
-            new_dict["output"] = tem_output
 
+            new_dict = {
+                "instruction": tem_instruction,
+                "input": tem_input,
+                "output": tem_output,
+            }
             final_list.append(new_dict)
 
-    fw=open("../formated_cot_data/"+data+"_train.json", "w", encoding="utf8")
+    fw = open(f"../formated_cot_data/{data}_train.json", "w", encoding="utf8")
     json.dump(final_list, fw, ensure_ascii=False)
 
 cot_process(data="strategyqa")
